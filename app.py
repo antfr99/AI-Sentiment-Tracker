@@ -31,7 +31,7 @@ from supabase import create_client, Client
 # ─────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Prediction Timelines", layout="wide")
 
-DEFAULT_WEEKS = 2
+DEFAULT_WEEKS = 52
 FETCH_CAP = 5000  # bound the pull; we only ever chart a couple weeks per company
 
 
@@ -137,8 +137,18 @@ with c1:
         format_func=lambda t: company_label(df_all, t),
     )
 with c2:
-    n_weeks = st.number_input("Weeks", min_value=1, max_value=12,
-                              value=DEFAULT_WEEKS, step=1)
+    # Clamp any persisted widget state into range BEFORE rendering — on
+    # Streamlit Cloud a session value saved under an old max_value can
+    # otherwise exceed the current bounds and raise StreamlitValueAboveMaxError.
+    WEEKS_MIN, WEEKS_MAX = 1, 52
+    if "n_weeks" in st.session_state:
+        st.session_state["n_weeks"] = int(
+            min(max(st.session_state["n_weeks"], WEEKS_MIN), WEEKS_MAX)
+        )
+    n_weeks = st.number_input(
+        "Weeks", min_value=WEEKS_MIN, max_value=WEEKS_MAX,
+        value=DEFAULT_WEEKS, step=1, key="n_weeks",
+    )
 with c3:
     if st.button("🔄 Refresh"):
         load_predictions.clear()
