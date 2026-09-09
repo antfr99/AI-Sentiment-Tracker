@@ -394,21 +394,23 @@ if {"sentiment_score", "actual_close"}.issubset(df_win.columns):
         rel = rel.sort_values("target_date")
         rel["close_change"] = rel["actual_close"].diff()
         pair = rel.dropna(subset=["close_change"])
+
+        st.subheader("6 · Corr: sentiment ↔ weekly price move")
         colA, colB = st.columns(2)
         with colA:
             if len(pair) >= 2 and pair["sentiment_score"].nunique() > 1:
                 corr_move = pair["sentiment_score"].corr(pair["close_change"])
-                st.metric("6 · Corr: sentiment ↔ weekly price move",
+                st.metric("Sentiment ↔ weekly price move",
                           f"{corr_move:+.2f}" if pd.notna(corr_move) else "n/a")
             else:
-                st.metric("6 · Corr: sentiment ↔ weekly price move", "n/a")
+                st.metric("Sentiment ↔ weekly price move", "n/a")
         with colB:
             if rel["sentiment_score"].nunique() > 1 and rel["actual_close"].nunique() > 1:
                 corr_lvl = rel["sentiment_score"].corr(rel["actual_close"])
-                st.metric("Corr: sentiment ↔ close level",
+                st.metric("Sentiment ↔ close level",
                           f"{corr_lvl:+.2f}" if pd.notna(corr_lvl) else "n/a")
             else:
-                st.metric("Corr: sentiment ↔ close level", "n/a")
+                st.metric("Sentiment ↔ close level", "n/a")
 
         st.caption(
             "+1 = move together, −1 = move opposite, ~0 = no linear link. "
