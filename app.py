@@ -114,6 +114,16 @@ def week_label(series: pd.Series) -> pd.Series:
 # ─────────────────────────────────────────────────────────────────
 st.title("📈 Per-Company Prediction Timelines")
 
+st.info(
+    "ℹ️ This is a personal project dashboard. The predictions are **run "
+    "manually** in a separate app — the "
+    "[Yahoo-Finance AI Ecosystem Walk-Forward ML Engine]"
+    "(https://huggingface.co/spaces/antfr99/Yahoo-Finance-AI-Ecosystem-Walk-Forward-ML-Engine) "
+    "on Hugging Face Spaces — and each run stores its results in Supabase. "
+    "This dashboard only **reads** that stored data; it does not run any "
+    "predictions itself."
+)
+
 client = get_client()
 if client is None:
     st.error(
@@ -129,11 +139,48 @@ if df_all.empty:
 
 tickers = sorted(df_all["ticker"].dropna().unique())
 
+# ── Ecosystem → Sector → Company cascade ────────────────────────────────
+# ecosystem/sector are stored on every prediction row, so we filter the
+# ticker list down the same way the source Gradio app groups them.
+has_eco = "ecosystem" in df_all.columns and df_all["ecosystem"].notna().any()
+has_sec = "sector" in df_all.columns and df_all["sector"].notna().any()
+
+f1, f2 = st.columns(2)
+scope = df_all.copy()
+
+with f1:
+    if has_eco:
+        eco_opts = ["All ecosystems"] + sorted(
+            df_all["ecosystem"].dropna().unique().tolist()
+        )
+        ecosystem = st.selectbox("Ecosystem", options=eco_opts, key="eco")
+        if ecosystem != "All ecosystems":
+            scope = scope[scope["ecosystem"] == ecosystem]
+    else:
+        ecosystem = "All ecosystems"
+
+with f2:
+    if has_sec:
+        sec_opts = ["All sectors"] + sorted(
+            scope["sector"].dropna().unique().tolist()
+        )
+        sector = st.selectbox("Sector", options=sec_opts, key="sec")
+        if sector != "All sectors":
+            scope = scope[scope["sector"] == sector]
+    else:
+        sector = "All sectors"
+
+# Company list respects the ecosystem/sector filters above.
+scoped_tickers = sorted(scope["ticker"].dropna().unique().tolist())
+if not scoped_tickers:
+    st.info("No companies stored for this ecosystem/sector selection yet.")
+    st.stop()
+
 c1, c2, c3 = st.columns([3, 1, 1])
 with c1:
     ticker = st.selectbox(
         "Company",
-        options=tickers,
+        options=scoped_tickers,
         format_func=lambda t: company_label(df_all, t),
     )
 with c2:
@@ -163,9 +210,16 @@ if df_win.empty:
 
 df_win["Week"] = week_label(df_win["target_date"])
 
+_scope_bits = []
+if has_eco and ecosystem != "All ecosystems":
+    _scope_bits.append(ecosystem)
+if has_sec and sector != "All sectors":
+    _scope_bits.append(sector)
+_scope_txt = f" ({' · '.join(_scope_bits)})" if _scope_bits else ""
+
 st.caption(
     f"Showing the last {len(df_win['Week'].unique())} week(s) for "
-    f"**{company_label(df_all, ticker)}** — target dates "
+    f"**{company_label(df_all, ticker)}**{_scope_txt} — target dates "
     f"{df_win['Week'].iloc[0]} → {df_win['Week'].iloc[-1]}."
 )
 
@@ -305,10 +359,10 @@ if {"sentiment_score", "actual_close"}.issubset(df_win.columns):
         with colA:
             if len(pair) >= 2 and pair["sentiment_score"].nunique() > 1:
                 corr_move = pair["sentiment_score"].corr(pair["close_change"])
-                st.metric("Corr: sentiment ↔ weekly price move",
+                st.metric("6 · Corr: sentiment ↔ weekly price move",
                           f"{corr_move:+.2f}" if pd.notna(corr_move) else "n/a")
             else:
-                st.metric("Corr: sentiment ↔ weekly price move", "n/a")
+                st.metric("6 · Corr: sentiment ↔ weekly price move", "n/a")
         with colB:
             if rel["sentiment_score"].nunique() > 1 and rel["actual_close"].nunique() > 1:
                 corr_lvl = rel["sentiment_score"].corr(rel["actual_close"])
