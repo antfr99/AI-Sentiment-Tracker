@@ -31,7 +31,7 @@ from supabase import create_client, Client
 # ─────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Prediction Timelines", layout="wide")
 
-DEFAULT_WEEKS = 2
+DEFAULT_WEEKS = 14
 FETCH_CAP = 5000  # bound the pull; we only ever chart a couple weeks per company
 
 
@@ -40,8 +40,8 @@ FETCH_CAP = 5000  # bound the pull; we only ever chart a couple weeks per compan
 # ─────────────────────────────────────────────────────────────────
 @st.cache_resource
 def get_client() -> Client:
-    url = os.environ.get("SUPABASE_URL", "").strip()
-    key = os.environ.get("SUPABASE_KEY", "").strip()
+    url = (st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL", "")).strip()
+    key = (st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY", "")).strip()
     if not url or not key:
         return None
     return create_client(url, key)
