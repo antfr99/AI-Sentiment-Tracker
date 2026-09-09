@@ -371,11 +371,17 @@ st.subheader("5 · Sentiment vs Actual Close — Relationship")
 if {"sentiment_score", "actual_close"}.issubset(df_win.columns):
     rel = df_win.dropna(subset=["sentiment_score", "actual_close"]).copy()
     if len(rel) >= 2:
-        # Dual-axis per-week overlay: sentiment (bars) vs actual close (line)
+        # Dual-axis per-week overlay: sentiment (bars) vs actual close (line).
+        # Bars are green when sentiment is >= 0, light orange when negative.
         base = alt.Chart(rel).encode(x=X_WEEK)
-        sent_bars = base.mark_bar(opacity=0.45, color="#54a24b").encode(
+        sent_bars = base.mark_bar(opacity=0.55).encode(
             y=alt.Y("sentiment_score:Q", title="Avg Sentiment",
                     scale=alt.Scale(domain=[-1, 1])),
+            color=alt.condition(
+                alt.datum.sentiment_score >= 0,
+                alt.value("#54a24b"),   # green — non-negative sentiment
+                alt.value("#f2b077"),   # light orange — negative sentiment
+            ),
             tooltip=["Week", "sentiment_score"],
         )
         close_line = base.mark_line(point=True, color="#e45756").encode(
