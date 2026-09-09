@@ -76,6 +76,25 @@ def load_predictions() -> pd.DataFrame:
 
     df = df.dropna(subset=["target_date"])
 
+    # Recover the 0–3 Signal Score for older rows where total_points was
+    # never saved (NULL) but the text `signal` label was. Same mapping the
+    # source Gradio app uses. New rows keep their stored total_points;
+    # only NULLs fall back to the label.
+    signal_points = {
+        "Strong Buy": 3,
+        "Buy / Hold": 2,
+        "Hold / Weak": 1,
+        "Avoid / Sell": 0,
+    }
+    if "total_points" in df.columns:
+        filled = df["total_points"].copy()
+    else:
+        filled = pd.Series(np.nan, index=df.index)
+    if "signal" in df.columns:
+        from_label = df["signal"].astype(str).str.strip().map(signal_points)
+        filled = filled.where(filled.notna(), from_label)
+    df["signal_points_filled"] = pd.to_numeric(filled, errors="coerce")
+
     # One genuine row per (ticker, target_date): the app was run more than
     # once a week historically, so a ticker can have >1 row for one Friday.
     # Keep the most recently MADE prediction for that week.
@@ -230,16 +249,36 @@ X_WEEK = alt.X("Week:O", title="Target Friday", sort=list(df_win["Week"]))
 # 1) Signal score per week
 # ─────────────────────────────────────────────────────────────────
 st.subheader("1 · Signal Score per Week")
-if "total_points" in df_win.columns and df_win["total_points"].notna().any():
-    base = alt.Chart(df_win).encode(x=X_WEEK)
-    line = base.mark_line(point=True, color="#4c78a8").encode(
-        y=alt.Y("total_points:Q", title="Signal Score (0–3)",
+if "signal_points_filled" in df_win.columns and df_win["signal_points_filled"].notna().any():
+    plot_df = df_win.copy()
+    # Flag which points came from the stored number vs. recovered from the
+    # text signal label (older rows where total_points was never saved).
+    stored = plot_df["total_points"] if "total_points" in plot_df.columns else pd.Series(np.nan, index=plot_df.index)
+    plot_df["Source"] = np.where(stored.notna(), "stored", "from signal label")
+
+    base = alt.Chart(plot_df).encode(x=X_WEEK)
+    line = base.mark_line(color="#4c78a8").encode(
+        y=alt.Y("signal_points_filled:Q", title="Signal Score (0–3)",
                 scale=alt.Scale(domain=[0, 3])),
-        tooltip=["Week", "total_points"],
     )
-    st.altair_chart(line, use_container_width=True)
+    pts = base.mark_point(size=70, filled=True).encode(
+        y=alt.Y("signal_points_filled:Q"),
+        color=alt.Color("Source:N",
+                        scale=alt.Scale(domain=["stored", "from signal label"],
+                                        range=["#4c78a8", "#f2a900"]),
+                        title="Score source"),
+        tooltip=["Week",
+                 alt.Tooltip("signal_points_filled:Q", title="Signal Score"),
+                 alt.Tooltip("signal:N", title="Signal") if "signal" in plot_df.columns else "Week",
+                 "Source"],
+    )
+    st.altair_chart(line + pts, use_container_width=True)
+    if (plot_df["Source"] == "from signal label").any():
+        st.caption("Orange points were recovered from the text Signal label "
+                   "(Strong Buy=3, Buy/Hold=2, Hold/Weak=1, Avoid/Sell=0) "
+                   "because those older rows never stored a numeric score.")
 else:
-    st.info("No `total_points` data for this window.")
+    st.info("No signal score data for this window.")
 
 
 # ─────────────────────────────────────────────────────────────────
