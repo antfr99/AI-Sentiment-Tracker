@@ -31,7 +31,7 @@ from supabase import create_client, Client
 # ─────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Prediction Timelines", layout="wide")
 
-DEFAULT_WEEKS = 14
+DEFAULT_WEEKS = 2
 FETCH_CAP = 5000  # bound the pull; we only ever chart a couple weeks per company
 
 
